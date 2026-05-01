@@ -1,4 +1,4 @@
-Here's the complete Claude Code prompt:
+
 
 ---
 
