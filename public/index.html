@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PIXELVAULT | Lossless Image Steganography</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Syne:wght@400..800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #f0f4ff;
+            --surface-color: #ffffff;
+            --primary: #0047ff;
+            --secondary: #00d4aa;
+            --text-dark: #0a0a1a;
+            --text-light: #4a4a5a;
+            --border-color: rgba(0, 71, 255, 0.15);
+            --border-hover: rgba(0, 71, 255, 0.4);
+            --shadow-sm: 0 2px 8px rgba(0, 71, 255, 0.04);
+            --shadow-md: 0 4px 24px rgba(0, 71, 255, 0.08);
+            --shadow-lg: 0 12px 48px rgba(0, 71, 255, 0.12);
+            --radius: 4px;
+            --transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            line-height: 1.5;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Subtle animated mesh gradient background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 50% 50%, rgba(0, 212, 170, 0.03) 0%, rgba(0, 71, 255, 0.05) 50%, transparent 100%);
+            z-index: -1;
+            animation: hueRotate 8s linear infinite alternate;
+            pointer-events: none;
+        }
+
+        @keyframes hueRotate {
+            0% { filter: hue-rotate(0deg); opacity: 0.8; transform: scale(1); }
+            100% { filter: hue-rotate(30deg); opacity: 1; transform: scale(1.1); }
+        }
+
+        h1, h2, h3, h4, .logo-text {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+        }
+
+        .mono {
+            font-family: 'DM Mono', monospace;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4rem;
+            animation: slideDown 0.6s ease forwards;
+            opacity: 0;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon svg {
+            width: 32px;
+            height: 32px;
+            color: var(--primary);
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            letter-spacing: -0.5px;
+            color: var(--primary);
+        }
+
+        .tagline {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-left: 1rem;
+            padding-left: 1rem;
+            border-left: 1px solid var(--border-color);
+            display: none;
+        }
+
+        @media (min-width: 600px) {
+            .tagline { display: block; }
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            background: rgba(0, 212, 170, 0.1);
+            color: #00a884;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 212, 170, 0.2);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        @media (min-width: 768px) {
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            position: relative;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .panel.animate-up {
+            animation: slideUp 0.6s ease forwards;
+        }
+
+        .panel:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            letter-spacing: 1px;
+            color: var(--primary);
+        }
+
+        .panel-badge {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            background: var(--bg-color);
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius);
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Forms & Inputs */
+        .step {
+            margin-bottom: 2rem;
+        }
+
+        .step-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-light);
+            margin-bottom: 0.75rem;
+            display: block;
+            font-weight: 600;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            background: rgba(0, 71, 255, 0.02);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-zone:hover, .drop-zone.dragover {
+            background: rgba(0, 71, 255, 0.05);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(0, 71, 255, 0.1);
+        }
+
+        .drop-zone.dragover {
+            animation: pulseBorder 1.5s infinite;
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .preview-container {
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+        }
+
+        .image-meta {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+            font-family: 'DM Mono', monospace;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--bg-color);
+            font-family: 'DM Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--text-dark);
+            resize: vertical;
+            transition: var(--transition);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.1);
+            background: var(--surface-color);
+        }
+
+        .char-counter {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.5rem;
+            font-family: 'DM Mono', monospace;
+        }
+
+        .capacity-bar {
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            margin-top: 0.5rem;
+            overflow: hidden;
+        }
+
+        .capacity-fill {
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .capacity-fill.danger { background: #ff3366; }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            border: none;
+            border-radius: var(--radius);
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+            text-decoration: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 71, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 71, 255, 0.4);
+            background: #003cd6;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: rgba(0, 71, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Loading Shimmer */
+        .shimmer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transform: translateX(-100%);
+        }
+
+        .loading .shimmer {
+            animation: shimmer 1.5s infinite;
+        }
+
+        /* Results States */
+        .result-box {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: rgba(0, 71, 255, 0.03);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .key-display {
+            font-size: 2rem;
+            color: var(--primary);
+            text-align: center;
+            margin: 1rem 0;
+            letter-spacing: 2px;
+        }
+
+        .warning-text {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .decoded-message {
+            min-height: 100px;
+            background: var(--surface-color);
+            padding: 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin: 1rem 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Error inline */
+        .error-msg {
+            color: #ff3366;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .error-msg svg { width: 16px; height: 16px; }
+
+        /* How it works */
+        .how-it-works {
+            margin-top: 4rem;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .how-it-works.animate-up {
+            animation: slideUp 0.6s ease forwards;
+            animation-delay: 0.4s;
+        }
+
+        .how-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: var(--text-dark);
+            font-size: 1.5rem;
+        }
+
+        .cards-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (min-width: 768px) {
+            .cards-row { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        .info-card {
+            background: var(--surface-color);
+            padding: 2rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .info-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary);
+        }
+
+        .info-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 1rem;
+            color: var(--secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 212, 170, 0.1);
+            border-radius: 50%;
+        }
+
+        .info-card h4 {
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .info-card p {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 4rem 0 2rem;
+            color: var(--text-light);
+            font-size: 0.875rem;
+            font-family: 'DM Mono', monospace;
+        }
+
+        /* Animations */
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes shimmer {
+            100% { transform: translateX(100%); }
+        }
+
+        @keyframes pulseBorder {
+            0% { border-color: var(--primary); }
+            50% { border-color: var(--secondary); }
+            100% { border-color: var(--primary); }
+        }
+
+        /* Hero Text Animation */
+        .hero-title span {
+            display: inline-block;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: textReveal 0.5s ease forwards;
+        }
+
+        @keyframes textReveal {
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 12l10 10 10-10L12 2z"></path>
+                        <path d="M12 12L2 12"></path>
+                        <path d="M12 12l10 0"></path>
+                        <path d="M12 2v20"></path>
+                    </svg>
+                </div>
+                <div class="logo-text">PIXELVAULT</div>
+                <div class="tagline">Lossless Image Steganography</div>
+            </div>
+            <div class="status-pill">
+                <span>●</span> SYSTEM READY
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- ENCODE PANEL -->
+            <div class="panel animate-up" id="encode-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title hero-title" id="encode-title">ENCODE</h2>
+                    <span class="panel-badge">01</span>
+                </div>
+
+                <div class="step">
+                    <label class="step-label">1. Select Cover Image</label>
+                    <div class="drop-zone" id="encode-drop">
+                        <p class="mono">Drag & drop image or click to browse</p>
+                        <p style="font-size: 0.75rem; color: var(--text-light); margin-top: 0.5rem;">PNG, JPG, BMP, WEBP (Max 10MB)</p>
+                        <input type="file" id="encode-file" accept="image/png, image/jpeg, image/jpg, image/bmp, image/webp">
+                    </div>
+                    <div class="error-msg" id="encode-file-error">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span></span>
+                    </div>
+                    <div class="preview-container" id="encode-preview-cont">
+                        <img id="encode-preview" class="preview-img" src="" alt="Preview">
+                        <div class="image-meta" id="encode-meta"></div>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <label class="step-label">2. Secret Message</label>
+                    <textarea id="encode-message" placeholder="Enter the secret message to hide... (ASCII characters only)" disabled></textarea>
+                    <div class="error-msg" id="encode-msg-error">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span></span>
+                    </div>
+                    <div class="char-counter">
+                        <span id="char-count">0 / 0 characters</span>
+                        <span id="capacity-pct">0% capacity</span>
+                    </div>
+                    <div class="capacity-bar">
+                        <div class="capacity-fill" id="capacity-fill"></div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="btn-encode" disabled>
+                    <span class="btn-text">ENCODE IMAGE</span>
+                    <div class="shimmer"></div>
+                </button>
+                <div class="error-msg" id="encode-server-error" style="margin-top: 1rem; text-align: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span></span>
+                </div>
+
+                <div class="result-box" id="encode-result">
+                    <div class="step-label" style="text-align: center;">ENCRYPTION KEY</div>
+                    <div class="key-display mono" id="generated-key"></div>
+                    <div class="warning-text">Key is embedded in image. No need to share separately.</div>
+                    <a id="download-link" class="btn btn-outline" download="encoded.png">DOWNLOAD ENCODED IMAGE</a>
+                    <div class="warning-text" style="margin-top:1rem; color: #ff3366;">Do not convert or re-save this file as JPG. Converting to JPG will permanently destroy the hidden message.</div>
+                </div>
+            </div>
+
+            <!-- DECODE PANEL -->
+            <div class="panel animate-up" id="decode-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title hero-title" id="decode-title">DECODE</h2>
+                    <span class="panel-badge">10</span>
+                </div>
+
+                <div class="step" style="margin-bottom: 3rem;">
+                    <label class="step-label">Upload Encoded Image</label>
+                    <div class="drop-zone" id="decode-drop">
+                        <p class="mono">Drag & drop PNG image or click to browse</p>
+                        <p style="font-size: 0.75rem; color: #ff3366; margin-top: 0.5rem;">PNG files ONLY</p>
+                        <input type="file" id="decode-file" accept="image/png">
+                    </div>
+                    <div class="error-msg" id="decode-file-error">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span></span>
+                    </div>
+                    <div class="preview-container" id="decode-preview-cont">
+                        <img id="decode-preview" class="preview-img" src="" alt="Preview">
+                        <div class="image-meta mono" id="decode-meta"></div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="btn-decode" disabled>
+                    <span class="btn-text">DECODE IMAGE</span>
+                    <div class="shimmer"></div>
+                </button>
+                <div class="error-msg" id="decode-server-error" style="margin-top: 1rem; text-align: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    <span></span>
+                </div>
+
+                <div class="result-box" id="decode-result">
+                    <div class="step-label">RECOVERED MESSAGE</div>
+                    <div class="decoded-message mono" id="recovered-message"></div>
+                    <div class="image-meta" id="recovered-meta"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="how-it-works animate-up">
+            <h3 class="how-title">HOW IT WORKS</h3>
+            <div class="cards-row">
+                <div class="info-card">
+                    <div class="info-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                    </div>
+                    <h4>LSB Substitution</h4>
+                    <p>Replaces the visually imperceptible Least Significant Bits of pixel color channels with your message data.</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                    </div>
+                    <h4>Cryptographic Spread</h4>
+                    <p>A random key dictates a unique sequence of pixels for embedding, preventing sequential pattern detection.</p>
+                </div>
+                <div class="info-card">
+                    <div class="info-icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                    </div>
+                    <h4>Lossless Output</h4>
+                    <p>Generates PNG files to ensure no pixel data is lost via compression, guaranteeing perfect retrieval.</p>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            Built with Python + OpenCV · LSB Steganography · PNG Lossless Output
+        </footer>
+    </div>
+
+    <script>
+        // Animate hero titles
+        function animateText(id) {
+            const el = document.getElementById(id);
+            const text = el.innerText;
+            el.innerHTML = '';
+            text.split('').forEach((char, i) => {
+                const span = document.createElement('span');
+                span.innerText = char;
+                span.style.animationDelay = `${i * 0.05}s`;
+                el.appendChild(span);
+            });
+        }
+        animateText('encode-title');
+        animateText('decode-title');
+
+        // Typewriter effect
+        async function typewriterEffect(element, text, speed = 30) {
+            element.innerHTML = '';
+            element.style.display = 'block';
+            for (let i = 0; i < text.length; i++) {
+                element.innerHTML += text.charAt(i);
+                await new Promise(r => setTimeout(r, speed));
+            }
+        }
+
+        // State
+        let currentMaxChars = 0;
+        let encodeFile = null;
+        let decodeFile = null;
+
+        // Elements
+        const elEncodeFile = document.getElementById('encode-file');
+        const elEncodeDrop = document.getElementById('encode-drop');
+        const elEncodeMsg = document.getElementById('encode-message');
+        const elBtnEncode = document.getElementById('btn-encode');
+        const elEncodeResult = document.getElementById('encode-result');
+        const elEncodeError = document.getElementById('encode-file-error');
+        const elEncodeMsgError = document.getElementById('encode-msg-error');
+        const elEncodeServerErr = document.getElementById('encode-server-error');
+
+        const elDecodeFile = document.getElementById('decode-file');
+        const elDecodeDrop = document.getElementById('decode-drop');
+        const elBtnDecode = document.getElementById('btn-decode');
+        const elDecodeResult = document.getElementById('decode-result');
+        const elDecodeError = document.getElementById('decode-file-error');
+        const elDecodeServerErr = document.getElementById('decode-server-error');
+
+        // Helpers
+        function showError(el, msg) {
+            if (msg) {
+                el.querySelector('span').innerText = msg;
+                el.style.display = 'flex';
+            } else {
+                el.style.display = 'none';
+            }
+        }
+
+        function checkAscii(str) {
+            for (let i = 0; i < str.length; i++) {
+                if (str.charCodeAt(i) > 127) return false;
+            }
+            return true;
+        }
+
+        // Setup Drag & Drop
+        function setupDropZone(dropEl, inputEl, onFile) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropEl.addEventListener(eventName, preventDefaults, false);
+            });
+            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropEl.addEventListener(eventName, () => dropEl.classList.add('dragover'), false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropEl.addEventListener(eventName, () => dropEl.classList.remove('dragover'), false);
+            });
+            dropEl.addEventListener('drop', (e) => {
+                let dt = e.dataTransfer;
+                let files = dt.files;
+                if (files.length) { inputEl.files = files; onFile(files[0]); }
+            }, false);
+            inputEl.addEventListener('change', (e) => {
+                if (e.target.files.length) onFile(e.target.files[0]);
+            });
+        }
+
+        // Encode Image Upload Handler
+        setupDropZone(elEncodeDrop, elEncodeFile, async (file) => {
+            showError(elEncodeError, '');
+            showError(elEncodeServerErr, '');
+            elEncodeResult.style.display = 'none';
+            encodeFile = null;
+            elEncodeMsg.disabled = true;
+            elBtnEncode.disabled = true;
+
+            if (!file) return;
+
+            // Validate File Type
+            const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                return showError(elEncodeError, 'Invalid file type. Upload PNG, JPG, BMP, or WEBP only.');
+            }
+
+            // Validate File Size (1KB to 10MB)
+            if (file.size < 1024) return showError(elEncodeError, 'File too small to be a valid image.');
+            if (file.size > 10 * 1024 * 1024) return showError(elEncodeError, 'Image too large. Maximum 10MB.');
+
+            // Image Preview & Info API
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                // Show preview locally first
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('encode-preview').src = e.target.result;
+                    document.getElementById('encode-preview-cont').style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+
+                const res = await fetch('/api/image_info', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.error || 'Failed to analyze image');
+
+                currentMaxChars = data.max_message_length;
+                document.getElementById('encode-meta').innerText = `Dimensions: ${data.width}x${data.height} | Capacity: ${currentMaxChars} chars`;
+                
+                encodeFile = file;
+                elEncodeMsg.disabled = false;
+                validateEncodeForm();
+            } catch (err) {
+                showError(elEncodeError, err.message);
+                document.getElementById('encode-preview-cont').style.display = 'none';
+            }
+        });
+
+        // Encode Message Handler
+        elEncodeMsg.addEventListener('input', validateEncodeForm);
+
+        function validateEncodeForm() {
+            showError(elEncodeMsgError, '');
+            const msg = elEncodeMsg.value;
+            const len = msg.length;
+            
+            // Update counter & bar
+            document.getElementById('char-count').innerText = `${len} / ${currentMaxChars} characters`;
+            const pct = currentMaxChars > 0 ? Math.min(100, (len / currentMaxChars) * 100) : 0;
+            const bar = document.getElementById('capacity-fill');
+            bar.style.width = `${pct}%`;
+            document.getElementById('capacity-pct').innerText = `${pct.toFixed(1)}% capacity`;
+
+            if (pct > 90) bar.classList.add('danger');
+            else bar.classList.remove('danger');
+
+            let isValid = true;
+            if (len === 0 || !msg.trim()) isValid = false;
+            else if (len > currentMaxChars) {
+                showError(elEncodeMsgError, `Message too long. Max ${currentMaxChars} characters for this image.`);
+                isValid = false;
+            } else if (!checkAscii(msg)) {
+                showError(elEncodeMsgError, 'Message contains unsupported characters. Use ASCII only (no emoji or special symbols).');
+                isValid = false;
+            }
+
+            elBtnEncode.disabled = !isValid || !encodeFile;
+        }
+
+        // Encode Action
+        elBtnEncode.addEventListener('click', async () => {
+            if (!encodeFile || elBtnEncode.disabled) return;
+            
+            showError(elEncodeServerErr, '');
+            elBtnEncode.disabled = true;
+            elBtnEncode.classList.add('loading');
+            elEncodeMsg.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', encodeFile);
+            formData.append('message', elEncodeMsg.value);
+
+            try {
+                const res = await fetch('/api/encode', { method: 'POST', body: formData });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || 'Encoding failed');
+                }
+
+                const key = res.headers.get('X-Steg-Key');
+                if (!key) throw new Error('Server did not return encryption key.');
+
+                const blob = await res.blob();
+                const url = window.URL.createObjectURL(blob);
+                
+                const dlLink = document.getElementById('download-link');
+                dlLink.href = url;
+                
+                elEncodeResult.style.display = 'block';
+                await typewriterEffect(document.getElementById('generated-key'), key, 100);
+
+            } catch (err) {
+                showError(elEncodeServerErr, err.message);
+            } finally {
+                elBtnEncode.classList.remove('loading');
+                elBtnEncode.disabled = false;
+                elEncodeMsg.disabled = false;
+            }
+        });
+
+
+        // Decode Image Upload Handler
+        setupDropZone(elDecodeDrop, elDecodeFile, (file) => {
+            showError(elDecodeError, '');
+            showError(elDecodeServerErr, '');
+            elDecodeResult.style.display = 'none';
+            decodeFile = null;
+            elBtnDecode.disabled = true;
+
+            if (!file) return;
+
+            if (file.type !== 'image/png' && !file.name.toLowerCase().endsWith('.png')) {
+                return showError(elDecodeError, 'Decode requires a PNG file. JPG/WEBP will not work as they alter pixel values.');
+            }
+
+            if (file.size < 1024) return showError(elDecodeError, 'File too small.');
+            if (file.size > 10 * 1024 * 1024) return showError(elDecodeError, 'Image too large. Maximum 10MB.');
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('decode-preview').src = e.target.result;
+                document.getElementById('decode-preview-cont').style.display = 'block';
+                document.getElementById('decode-meta').innerText = `File: ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+                decodeFile = file;
+                elBtnDecode.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Decode Action
+        elBtnDecode.addEventListener('click', async () => {
+            if (!decodeFile || elBtnDecode.disabled) return;
+            
+            showError(elDecodeServerErr, '');
+            elBtnDecode.disabled = true;
+            elBtnDecode.classList.add('loading');
+            elDecodeResult.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('image', decodeFile);
+
+            try {
+                const res = await fetch('/api/decode', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if (!res.ok) throw new Error(data.error || 'Decoding failed');
+
+                elDecodeResult.style.display = 'block';
+                document.getElementById('recovered-meta').innerText = `Key: ${data.key} | Length: ${data.length} chars`;
+                await typewriterEffect(document.getElementById('recovered-message'), data.message, 15);
+
+            } catch (err) {
+                showError(elDecodeServerErr, err.message);
+            } finally {
+                elBtnDecode.classList.remove('loading');
+                elBtnDecode.disabled = false;
+            }
+        });
+
+    </script>
+</body>
+</html>
